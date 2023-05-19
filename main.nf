@@ -14,6 +14,7 @@ if( !nextflow.version.matches('>20.0') ) {
 date = new Date().format('yyyyMMdd')
 
 // Parameters
+params.help = null
 params.data = null
 params.boot_n = null
 params.seed = 99
@@ -64,11 +65,11 @@ B O O T    I T   U P ! ! !
 workflow {
     // Get inputs
     config = Channel.fromPath("${params.bin_dir}/config.boots.R")
-            .combine(Channel.from("${params.data}"))
-            .combine(Channel.from("${params.boot_n}"))
-            .combine(Channel.from("${params.seed}"))
-            .combine(Channel.from("${params.out}"))
-            //.view()
+        .combine(Channel.from("${params.data}"))
+        .combine(Channel.from("${params.boot_n}"))
+        .combine(Channel.from("${params.seed}"))
+        .combine(Channel.from("${params.out}"))
+        //.view()
 
     // configure boots
     configBoot(config)
@@ -84,21 +85,12 @@ workflow {
     // run the bootstraps
     runBoots(boots)
 
-    // get files for output
-    //procBoots_in = runBoots.out.bootsOutput
-        //.last() // This ensures that all items are emitted from runBoots
-        //.combine(Channel.from("${params.out}"))
-        //.combine(Channel.fromPath("${params.bin_dir}/procBoots.R"))
-        //.view()
-
-    // run delly for pairwise-indel finder (pif)
-    //procBoots(procBoots_in)
-
+    // send output to procBoots channel
+    procBoots_ch = runBoots.out.bootsOutput.collect() | procBoots
     
 }
 
 process configBoot {
-    publishDir "${params.out}/data", mode: 'copy', pattern: "*.tsv"
     publishDir "${params.out}/data", mode: 'copy', pattern: "*.rda"
     conda '/projects/b1059/software/conda_envs/R4.2.2'
 
@@ -118,7 +110,7 @@ process configBoot {
 }
 
 process runBoots {
-    publishDir "${params.out}/data", mode: 'copy', pattern: "*.tsv"
+    //publishDir "${params.out}/data", mode: 'copy', pattern: "*.tsv"
     conda '/projects/b1059/software/conda_envs/R4.2.2'
 
     input:
@@ -134,17 +126,18 @@ process runBoots {
     """
 }
 
-// process procBoots {
+process procBoots {
+    publishDir "${params.out}/data", mode: 'copy', pattern: "*.tsv"
+    
+    input:
+        path("*")
 
-//     input:
-//         path("*")
+    output:
+        path "*.tsv", emit: mergedBoots
 
-//     output:
-//         stdout emit: bootsOutput
+    """
+        # merge all the boots
+        awk 'FNR==1 && NR!=1 {next} 1' *.tsv >> mergedBoots.tsv
 
-//     """
-//         # Configure boots with configBoots.R
-//         Rscript --vanilla ${script} ${data} ${seed} ${out}
-
-//     """
-// }
+    """
+}

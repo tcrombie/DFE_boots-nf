@@ -26,6 +26,15 @@ data <- data.table::fread(args[1]) %>%
   dplyr::filter(rowSums(is.na(.)) != 169) %>% # remove lines with all missing genotypes
   dplyr::select(-p_focal, -p_comp)
 
+# Get loci with too few genotyped lines n < 120
+bad_loci <- data %>%
+  dplyr::distinct(full_id, .keep_all = T) %>%
+  dplyr::select(-1:-4) %>%
+  summarise(across(everything(), ~ sum(!is.na(.)))) %>%
+  tidyr::pivot_longer(cols = everything()) %>%
+  dplyr::filter(value <120) %>%
+  dplyr::pull(name)
+
 # 2: get a line vector
 lines <- data %>%
   dplyr::distinct(full_id) %>%
